@@ -1,27 +1,22 @@
 from random import random
 from tabulate import tabulate
 import random
+from operator import itemgetter
 
 
-def initialPopulation(lb, up, popSize):
-    population = []
+def initialPopFit(lb, up, popSize):
+    initPopFit = []
     for j in range(popSize):
-        population.append([[j + 1], [round(random.uniform(lb, up), 2)]])
-    return population
+        popul = round(random.uniform(lb, up), 4)
+        initPopFit.append([j + 1, popul, round(popul ** 2, 4)])
+    return initPopFit
 
 
-def fitnessFunction(population):
-    for l in range(len(population)):
-        population[l][1][0] *= population[l][1][0]
-        population[l][1][0] = round(population[l][1][0], 2)
-    return population
-
-
-def getBestWorstSolution(fitness):
+def getBestWorstSolution(dataarr):
     data_arr = []
     res = []
-    for i in range(len(fitness)):
-        data_arr.append(fitness[i][1][0])
+    for i in range(len(dataarr)):
+        data_arr.append(dataarr[i][2])
     res.append(min(data_arr))
     res.append(max(data_arr))
     return res
@@ -29,7 +24,7 @@ def getBestWorstSolution(fitness):
 
 def calculateSigma(maxiterations, n, sigmainitial, sigmaend):
     res = ((((maxiterations - n) ** 2)/(maxiterations ** 2)) * (sigmainitial - sigmaend)) + sigmainitial
-    return round(res, 2)
+    return round(res, 4)
 
 
 if __name__ == '__main__':
@@ -42,22 +37,63 @@ if __name__ == '__main__':
     maxSeed = 5  # Максимальное кол-во семян
     sigmaInitial = 0.5  # Начальное отклонение
     sigmaEnd = 0.001  # Конечное отклонение
-    # bestSolution, worstSolution = float()
-    #for i in range(populationSizeInitial):
+    solutions = []
+    for i in range(populationSizeInitial):
+        print("------------------ ITERATION NUMBER", i + 1, " ------------------")
+        initialPopFitArr = initialPopFit(LB, UP, populationSizeInitial)
+        headers_pop = ["Number", "Initial population", "Initial fitness"]
+        print(tabulate(initialPopFitArr, headers_pop, tablefmt="grid"))
 
-    begin_population = initialPopulation(LB, UP, populationSizeInitial)  # Инициализация популяции
-    headers_pop = ["Number", "Initial population"]
-    print(tabulate(begin_population, headers_pop, tablefmt="grid"))
+        bestSolution = getBestWorstSolution(initialPopFitArr)[0]
+        print("BEST SOLUTION:", bestSolution)
+        worstSolution = getBestWorstSolution(initialPopFitArr)[1]
+        print("WORST SOLUTION:", worstSolution)
 
-    fitnessInitial = fitnessFunction(begin_population)
-    headers_fit = ["Number", "Initial fitness"]
-    print(tabulate(fitnessInitial, headers_fit, tablefmt="grid"))
+        sigma = calculateSigma(maxIterations, 1, sigmaInitial, sigmaEnd)
+        print("SIGMA", sigma)
 
-    bestSolution = getBestWorstSolution(fitnessInitial)[0]
-    print("BEST SOLUTION:", bestSolution)
+        # Фаза репродукции
+        newPopFitArr = []
+        n = 0
+        for j in range(len(initialPopFitArr)):
+            ratio = (initialPopFitArr[j][1] - worstSolution) / (bestSolution - worstSolution)  # помеенять на j
+            s = int((minSeed + (maxSeed - minSeed) * ratio))
+            if s == 0:
+                s = int((minSeed + (maxSeed - minSeed) * ratio))
+            # print(s)
+            for f in range(s):
+                n += 1
+                # Генерация рандомной локации
+                newSolutionPosition = initialPopFitArr[j][1] + (sigma * random.uniform(0.0012, 0.9174))  # помеенять на j
+                # Фитнесс значения
+                newFitness = round(newSolutionPosition ** 2, 4)
+                newPopFitArr.append([n, newSolutionPosition, newFitness])
+        headersNewPopFit = ["Number", "New population", "New fitness"]
+        print(tabulate(newPopFitArr, headersNewPopFit, tablefmt="grid"))
 
-    worstSolution = getBestWorstSolution(fitnessInitial)[1]
-    print("WORST SOLUTION:", worstSolution)
+        # Объединение популяций
+        mergedPopFitArr = newPopFitArr
+        for x in range(len(initialPopFitArr)):
+            mergedPopFitArr.append([len(mergedPopFitArr) + 1, initialPopFitArr[x][1], initialPopFitArr[x][2]])
+        headersMergedPopFit = ["Number", "Merged population", "Merged fitness"]
+        print(tabulate(mergedPopFitArr, headersMergedPopFit, tablefmt="grid"))
 
-    sigma = calculateSigma(maxIterations, 1, sigmaInitial, sigmaEnd)
-    print("SIGMA", sigma)
+        # Сортировка значений от минимума к масимуму
+        mergedPopFitArr = sorted(mergedPopFitArr, key=itemgetter(2))
+        print("[ SORTED BY FITNESS ]")
+        print(tabulate(mergedPopFitArr, headersMergedPopFit, tablefmt="grid"))
+
+        # Фаза конкурентного исключения
+        if len(mergedPopFitArr) > maxPopulationSize:
+            mergedPopFitArr = mergedPopFitArr[:maxPopulationSize]
+        print("[ COMPETITIVE EXCLUSION ]")
+        print(tabulate(mergedPopFitArr, headersMergedPopFit, tablefmt="grid"))
+
+        # Поиск лучшего решения в итерации и добавления в память
+        bestSolution = getBestWorstSolution(mergedPopFitArr)[0]
+        print("ITERATION", i + 1, "BEST SOLUTION:", bestSolution)
+        solutions.append([i + 1, bestSolution])
+    print("------------------ SOLUTIONS HISTORY ------------------")
+    headHistory = ["Iteration", "Solution"]
+    print(tabulate(solutions, headHistory, tablefmt="grid"))
+    print("BEST SOLUTION:", min(solutions))
